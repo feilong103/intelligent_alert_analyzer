@@ -7,3 +7,9 @@ chromadb
 dashscope
 fastapi
 uvicorn
+pandas
+openpyxl
+xlrd
+python-docx
+pdfplumber
+beautifulsoup4
