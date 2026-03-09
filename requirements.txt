@@ -5,3 +5,5 @@ langchain-core
 streamlit
 chromadb
 dashscope
+fastapi
+uvicorn
