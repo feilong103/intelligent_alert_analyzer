@@ -25,7 +25,9 @@ class KnowledgeBaseService(object):
 
 
     def upload_by_str(self, data, filename):
-        """ 将传入的字符串进行向量化，存入向量数据库中 """
+        """
+        原始文本 → LLM分割 → 写入KB
+        """
 
         # 先得到传入字符串的 md5 值
         md5_hex = get_string_md5(data)
@@ -72,6 +74,43 @@ class KnowledgeBaseService(object):
         save_md5(md5_hex)
 
         return f"[成功]内容已成功载入向量库，共切分为 {len(knowledge_chunks)} 个片段"
+
+    def upload_by_chunks(self, chunks, filename):
+        """将用户编辑后的 chunks 写入向量数据库"""
+
+        if not chunks:
+            return "[失败]没有可写入的知识片段"
+
+        # 计算整体 md5（用于去重）
+        combined_text = "\n".join(chunks)
+        md5_hex = get_string_md5(combined_text)
+
+        if check_md5(md5_hex):
+            return "[跳过]该知识内容已经存在知识库中"
+
+        # 打印 chunk 方便调试
+        for i, chunk in enumerate(chunks):
+            print(f"正在写入 Chunk {i+1}:")
+            print(chunk)
+            print("-" * 50)
+
+        # 组装 metadata
+        metadata = {
+            "source": filename,
+            "create_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "operator": "小王"
+        }
+
+        # 写入向量库
+        self.chroma.add_texts(
+            texts=chunks,
+            metadatas=[metadata for _ in chunks]
+        )
+
+        # 保存 md5
+        save_md5(md5_hex)
+
+        return f"[成功]知识库更新完成，共写入 {len(chunks)} 个知识片段"
 
 
 if __name__ == '__main__':
