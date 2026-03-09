@@ -10,9 +10,9 @@ collection_name = "rag"
 persist_directory = "./storage/chroma_db"
 
 # spliter settings
-chunk_size = 50
+chunk_size = 4096
 chunk_overlap = 0
-separators = ["\n", "\n\n", "。"]
+separators = ["----------"]
 
 # 检索返回匹配的文档数量
 similarity_k = 2
