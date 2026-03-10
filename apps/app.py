@@ -2,10 +2,27 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+
+import asyncio
+import json
+
+
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import StreamingResponse
+from fastapi.middleware.cors import CORSMiddleware
 from src.rag import RagService
 
 app = FastAPI()
+
+# ⭐ 解决跨域
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],   # 生产环境建议写具体域名
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 # 全局初始化（避免每次请求都加载模型）
 rag_service = RagService()
@@ -37,6 +54,41 @@ async def analyze_alert(request: Request):
 
         # 兜底
         return {"result": str(result)}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/analyze-alert-stream")
+async def analyze_alert_stream(request: Request):
+    """
+    流式返回接口
+    """
+    try:
+        body = await request.json()
+        alert = str(body)
+
+        async def event_generator():
+
+            try:
+                # LangChain stream
+                for chunk in rag_service.chain.stream(alert):
+
+                    if isinstance(chunk, dict):
+                        yield json.dumps(chunk, ensure_ascii=False)
+
+                    else:
+                        yield str(chunk)
+
+                    await asyncio.sleep(0.01)
+
+            except Exception as e:
+                yield f"\n[ERROR]{str(e)}"
+
+        return StreamingResponse(
+            event_generator(),
+            media_type="text/plain"
+        )
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
