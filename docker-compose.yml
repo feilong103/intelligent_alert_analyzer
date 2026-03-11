@@ -1,0 +1,26 @@
+version: "3.8"
+
+services:
+  api:
+    build: .
+    container_name: intelligent-alert-api
+    command: ["python", "-m", "uvicorn", "apps.app:app", "--host", "0.0.0.0", "--port", "8000"]
+    ports:
+      - "8000:8000"
+    environment:
+      - DASHSCOPE_API_KEY=${DASHSCOPE_API_KEY}
+    volumes:
+      - ./storage:/app/storage
+    restart: unless-stopped
+
+  uploader:
+    build: .
+    container_name: intelligent-alert-uploader
+    command: ["streamlit", "run", "apps/app_file_uploader.py", "--server.address", "0.0.0.0", "--server.port", "8501"]
+    ports:
+      - "8501:8501"
+    environment:
+      - DASHSCOPE_API_KEY=${DASHSCOPE_API_KEY}
+    volumes:
+      - ./storage:/app/storage
+    restart: unless-stopped
