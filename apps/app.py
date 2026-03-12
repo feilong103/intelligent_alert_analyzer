@@ -5,6 +5,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import asyncio
 import json
+import base64
 
 
 from fastapi import FastAPI, HTTPException, Request, File, UploadFile
@@ -116,6 +117,46 @@ async def prepare_kb_upload(file: UploadFile = File(...)):
             "chunks": chunks,
             "chunk_count": len(chunks)
         }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/kb/upload/prepare_base64")
+async def prepare_kb_upload_base64(request: Request):
+    """
+    接收 Base64 文件上传
+    请求体示例：
+    {
+        "filename": "example.txt",
+        "file_base64": "VGhpcyBpcyBhIHRlc3QgZmlsZS4="
+    }
+    """
+    try:
+        body = await request.json()
+        filename = body.get("filename")
+        file_base64 = body.get("file_base64")
+
+        if not filename or not file_base64:
+            raise HTTPException(status_code=400, detail="Missing filename or file_base64")
+
+        # 解码 Base64 为 bytes
+        file_bytes = base64.b64decode(file_base64)
+
+        # 调用解析函数
+        text = parse_file_to_text(file_bytes, filename)
+        llm_result = data_cleaner_service.chain.invoke({"raw_text": text})
+        chunks = [
+            chunk.strip()
+            for chunk in llm_result.split("----------")
+            if chunk.strip()
+        ]
+        return {
+            "filename": filename,
+            "llm_result": llm_result,
+            "chunks": chunks,
+            "chunk_count": len(chunks)
+        }
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
