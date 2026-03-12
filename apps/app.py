@@ -7,10 +7,13 @@ import asyncio
 import json
 
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, File, UploadFile
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from src.rag import RagService
+from src.knowledge_base import KnowledgeBaseService
+from utils.data_cleaner import DataCleanerService
+from utils.file_parser import parse_file_to_text
 
 app = FastAPI()
 
@@ -26,6 +29,8 @@ app.add_middleware(
 
 # 全局初始化（避免每次请求都加载模型）
 rag_service = RagService()
+kb_service = KnowledgeBaseService()
+data_cleaner_service = DataCleanerService()
 
 
 @app.post("/analyze-alert")
@@ -90,6 +95,45 @@ async def analyze_alert_stream(request: Request):
             media_type="text/plain"
         )
 
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/kb/upload/prepare")
+async def prepare_kb_upload(file: UploadFile = File(...)):
+    try:
+        file_bytes = await file.read()
+        text = parse_file_to_text(file_bytes, file.filename)
+        llm_result = data_cleaner_service.chain.invoke({"raw_text": text})
+        chunks = [
+            chunk.strip()
+            for chunk in llm_result.split("----------")
+            if chunk.strip()
+        ]
+        return {
+            "filename": file.filename,
+            "llm_result": llm_result,
+            "chunks": chunks,
+            "chunk_count": len(chunks)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/kb/upload/confirm")
+async def confirm_kb_upload(request: Request):
+    try:
+        body = await request.json()
+        filename = body.get("filename")
+        chunks = body.get("chunks")
+
+        if not filename or chunks is None:
+            raise HTTPException(status_code=400, detail="Missing filename or chunks")
+
+        result = kb_service.upload_by_chunks(chunks, filename)
+        return {"result": result}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

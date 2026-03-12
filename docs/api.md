@@ -17,6 +17,8 @@ RAG 告警智能分析系统是一个基于检索增强生成（RAG）技术的�
 |-----|-----|-----|
 | /analyze-alert | POST | 同步告警分析接口 |
 | /analyze-alert-stream | POST | 流式告警分析接口 |
+| /kb/upload/prepare | POST | 知识库上传准备（解析+LLM分块） |
+| /kb/upload/confirm | POST | 知识库上传确认（写入KB） |
 
 ## 3. 同步告警分析接口
 
@@ -237,7 +239,95 @@ curl -X POST "http://localhost:8000/analyze-alert-stream" \
 
 ---
 
-## 5. 错误处理
+## 5. 知识库上传接口
+
+### 5.1 准备接口
+
+#### 接口地址
+POST /kb/upload/prepare
+
+#### 请求格式
+Content-Type: multipart/form-data
+
+#### 请求参数
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| file | UploadFile | 是 | 知识库文件（支持 txt/pdf/docx/xlsx/csv/html/vtt 等） |
+
+#### 返回示例
+
+```json
+{
+  "filename": "demo.pdf",
+  "llm_result": "...省略...",
+  "chunks": [
+    "【知识标题】\n\n内容...",
+    "【知识标题】\n\n内容..."
+  ],
+  "chunk_count": 2
+}
+```
+
+#### CURL 调用示例
+
+```bash
+curl -X POST "http://localhost:8000/kb/upload/prepare" \
+  -F "file=@/path/to/demo.pdf"
+```
+
+### 5.2 确认接口
+
+#### 接口地址
+POST /kb/upload/confirm
+
+#### 请求格式
+Content-Type: application/json
+
+#### 请求参数
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| filename | string | 是 | 原始文件名 |
+| chunks | string[] | 是 | 用户最终确认后的知识片段数组 |
+
+#### 请求示例
+
+```json
+{
+  "filename": "demo.pdf",
+  "chunks": [
+    "【知识标题】\n\n内容...",
+    "【知识标题】\n\n内容..."
+  ]
+}
+```
+
+#### 返回示例
+
+```json
+{
+  "result": "[成功]知识库更新完成，共写入 2 个知识片段"
+}
+```
+
+#### CURL 调用示例
+
+```bash
+curl -X POST "http://localhost:8000/kb/upload/confirm" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "filename": "demo.pdf",
+    "chunks": [
+      "【知识标题】\n\n内容...",
+      "【知识标题】\n\n内容..."
+    ]
+  }'
+```
+
+---
+
+## 6. 错误处理
 
 系统使用标准的 HTTP 状态码进行错误处理：
 
@@ -264,7 +354,7 @@ curl -X POST "http://localhost:8000/analyze-alert-stream" \
 
 ---
 
-## 6. 系统配置
+## 7. 系统配置
 
 ### 服务启动
 
@@ -282,7 +372,7 @@ uvicorn apps.app:app --host 0.0.0.0 --port 8000
 
 ---
 
-## 7. 技术架构
+## 8. 技术架构
 
 ### 核心组件
 - **FastAPI**: Web 框架
@@ -299,7 +389,7 @@ uvicorn apps.app:app --host 0.0.0.0 --port 8000
 
 ---
 
-## 8. 使用建议
+## 9. 使用建议
 
 1. **数据格式**: 建议使用结构化的告警数据格式
 2. **流式接口**: 对于长文本分析，建议使用流式接口获得更好的用户体验
@@ -308,4 +398,4 @@ uvicorn apps.app:app --host 0.0.0.0 --port 8000
 
 ---
 
-*文档最后更新: 2026-03-11*
+*文档最后更新: 2026-03-12*
