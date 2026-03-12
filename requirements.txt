@@ -13,3 +13,4 @@ xlrd
 python-docx
 pdfplumber
 beautifulsoup4
+python-multipart
